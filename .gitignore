@@ -25,3 +25,5 @@ queue_service-*.tar
 
 # Temporary files for e.g. tests
 /tmp
+
+/persist
