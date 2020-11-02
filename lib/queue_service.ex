@@ -1,2 +1,0 @@
-defmodule QueueService do
-end
