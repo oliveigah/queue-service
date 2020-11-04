@@ -15,14 +15,14 @@ defmodule LoadTest.Queue do
     100_000
   ]
   def run do
-    Queue.new()
+    Queue.new("test")
     |> add_events(1)
     |> remove_events(1)
 
     Enum.each(@events_quantity, fn qty ->
       {add_time, queue} =
         :timer.tc(fn ->
-          Queue.new()
+          Queue.new("test")
           |> add_events(qty)
         end)
 

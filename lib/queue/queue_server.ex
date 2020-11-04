@@ -1,8 +1,8 @@
 defmodule Queue.Server do
-  use GenServer
+  use GenServer, restart: :temporary
 
   @messages_folder "messages"
-  @idle_timeout :timer.minutes(2)
+  @idle_timeout :timer.seconds(300)
 
   @impl GenServer
   def init(id) do
@@ -29,14 +29,22 @@ defmodule Queue.Server do
 
   ## -------- Handle Call --------
   @impl GenServer
-  def handle_call({:add, event_data}, _from, %Queue{} = current_state) do
+  def handle_call({:add, event_data}, _from, %Queue{id: id} = current_state) do
     new_state = Queue.add(current_state, event_data)
-    {:reply, {:ok, new_state.length}, new_state}
+    persist_event(new_state)
+
+    request_consumer(id)
+
+    {:reply, {:ok, new_state.length}, new_state, @idle_timeout}
   end
 
-  def handle_call(:remove, _from, %Queue{} = current_state) do
+  def handle_call(:remove, _from, %Queue{id: id} = current_state) do
     new_state = Queue.remove(current_state)
-    {:reply, {:ok, new_state.length}, new_state}
+    persist_event(new_state)
+
+    if new_state.length > 0, do: request_consumer(id)
+
+    {:reply, {:ok, new_state.length}, new_state, @idle_timeout}
   end
 
   def handle_call(:get, _from, %Queue{} = current_state) do
@@ -45,26 +53,61 @@ defmodule Queue.Server do
         {:reply, {:ok, event, current_state.length}, current_state}
 
       {:empty, nil} ->
-        {:reply, :empty, current_state}
+        {:reply, :empty, current_state, @idle_timeout}
     end
   end
 
   ## -------- Handle Info --------
   @impl GenServer
   def handle_info({:real_init, id}, _state) do
+    start_consumer(id)
+
     case FileDatabase.get(id, @messages_folder) do
       nil ->
-        new_queue = Queue.new()
+        new_queue = Queue.new(id)
+        FileDatabase.store_sync(id, new_queue, @messages_folder)
         {:noreply, new_queue, @idle_timeout}
 
       data ->
+        request_consumer(id)
         {:noreply, data, @idle_timeout}
+    end
+  end
+
+  def handle_info(:timeout, %Queue{} = state) do
+    {:stop, :normal, state}
+  end
+
+  @impl GenServer
+  def terminate(_reason, %Queue{length: current_length, id: id}) do
+    if current_length <= 0 do
+      FileDatabase.delete(id, @messages_folder)
     end
   end
 
   ## -------- Private Functions --------
 
   defp via_tuple(id) do
-    Queue.ProcessRegistry.via_tuple(id)
+    Queue.ProcessRegistry.via_tuple({__MODULE__, id})
+  end
+
+  defp start_consumer(id) do
+    children = [
+      %{
+        id: Queue.Consumer,
+        start: {Queue.Consumer, :start_link, [id]}
+      }
+    ]
+
+    Supervisor.start_link(children, strategy: :one_for_one)
+  end
+
+  defp request_consumer(id) do
+    [{consumer_pid, _}] = Registry.lookup(Queue.ProcessRegistry, {Queue.Consumer, id})
+    send(consumer_pid, :consume)
+  end
+
+  defp persist_event(%Queue{id: id} = state) do
+    FileDatabase.store_sync(id, state, @messages_folder)
   end
 end

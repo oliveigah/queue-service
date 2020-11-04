@@ -50,17 +50,25 @@ defmodule FileDatabase do
     )
   end
 
-  def store_sync(key, value, folder) do
-    teste =
-      :erpc.multicall(
-        Node.list([:this, :visible]),
-        __MODULE__,
-        :store_local_sync,
-        [key, value, folder],
-        :timer.seconds(5)
-      )
+  def delete_local(key, folder) do
+    final_folder = concatenate_folder(folder)
 
-    IO.inspect(teste)
+    :poolboy.transaction(
+      __MODULE__,
+      fn worker_pid ->
+        FileDatabase.Worker.delete(worker_pid, key, final_folder)
+      end
+    )
+  end
+
+  def store_sync(key, value, folder) do
+    :erpc.multicall(
+      Node.list([:this, :visible]),
+      __MODULE__,
+      :store_local_sync,
+      [key, value, folder],
+      :timer.seconds(5)
+    )
 
     :ok
   end
@@ -73,6 +81,16 @@ defmodule FileDatabase do
       fn worker_pid ->
         FileDatabase.Worker.get(worker_pid, key, final_folder)
       end
+    )
+  end
+
+  def delete(key, folder) do
+    :erpc.multicall(
+      Node.list([:this, :visible]),
+      __MODULE__,
+      :delete_local,
+      [key, folder],
+      :timer.seconds(5)
     )
   end
 end

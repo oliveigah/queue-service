@@ -19,6 +19,10 @@ defmodule FileDatabase.Worker do
     GenServer.call(pid, {:get, key, folder})
   end
 
+  def delete(pid, key, folder) do
+    GenServer.call(pid, {:delete, key, folder})
+  end
+
   def init(_) do
     {:ok, nil}
   end
@@ -53,5 +57,11 @@ defmodule FileDatabase.Worker do
       |> File.write!(:erlang.term_to_binary(value))
 
     {:reply, result, nil}
+  end
+
+  @doc false
+  def handle_call({:delete, key, folder_path}, _from, _state) do
+    File.rm!("#{folder_path}/#{key}")
+    {:reply, :ok, nil}
   end
 end

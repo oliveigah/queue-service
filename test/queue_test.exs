@@ -5,7 +5,7 @@ defmodule QueueTest do
 
   test "queue structure" do
     q =
-      Queue.new()
+      Queue.new("test")
       |> Queue.add("event 1")
       |> Queue.add("event 2")
       |> Queue.add("event 3")

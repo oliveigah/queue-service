@@ -1,23 +1,28 @@
 defmodule Queue do
   defstruct data: :queue.new(),
-            length: 0
+            length: 0,
+            id: "default"
 
-  def new() do
-    %Queue{}
+  def new(id) do
+    %Queue{id: id}
   end
 
-  def add(%Queue{data: current_data, length: current_length}, event_data) do
+  def add(%Queue{data: current_data, length: current_length} = queue, event_data) do
     new_data = :queue.in(event_data, current_data)
     new_length = current_length + 1
 
-    %Queue{data: new_data, length: new_length}
+    queue
+    |> Map.put(:data, new_data)
+    |> Map.put(:length, new_length)
   end
 
-  def remove(%Queue{data: current_data, length: current_length}) do
+  def remove(%Queue{data: current_data, length: current_length} = queue) do
     {_, new_data} = :queue.out(current_data)
     new_length = max(0, current_length - 1)
 
-    %Queue{data: new_data, length: new_length}
+    queue
+    |> Map.put(:data, new_data)
+    |> Map.put(:length, new_length)
   end
 
   def get(%Queue{length: 0}) do
