@@ -2,12 +2,12 @@ defmodule Queue.Server do
   use GenServer, restart: :temporary
 
   @messages_folder "messages"
-  @idle_timeout :timer.seconds(300)
+  @idle_timeout :timer.seconds(15)
 
   @impl GenServer
   def init(id) do
     send(self(), {:real_init, id})
-    {:ok, nil}
+    {:ok, nil, @idle_timeout}
   end
 
   ## -------- Public Interface --------
@@ -50,7 +50,7 @@ defmodule Queue.Server do
   def handle_call(:get, _from, %Queue{} = current_state) do
     case Queue.get(current_state) do
       {:ok, event} ->
-        {:reply, {:ok, event, current_state.length}, current_state}
+        {:reply, {:ok, event, current_state.length}, current_state, @idle_timeout}
 
       {:empty, nil} ->
         {:reply, :empty, current_state, @idle_timeout}

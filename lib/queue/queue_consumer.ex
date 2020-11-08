@@ -1,7 +1,7 @@
 defmodule Queue.Consumer do
   use GenServer
 
-  @route "localhost:7000/simulate-busy"
+  @consumer_route Application.compile_env!(:queue_service, :consumer_route)
   @base_headers [
     {"Content-Type", "Application/json"},
     {"Accept", "Application/json"}
@@ -39,14 +39,28 @@ defmodule Queue.Consumer do
 
   defp http_post(data, headers \\ @base_headers) do
     {:ok, body} = Poison.encode(data)
-    {:ok, http_result} = HTTPoison.post(@route, body, headers)
-    status_code = Map.get(http_result, :status_code, 500)
-    {:ok, result_body} = Poison.decode(Map.get(http_result, :body))
 
-    if(Map.get(@success_codes, status_code, false)) do
-      {:ok, result_body}
-    else
-      {:error, result_body}
+    post_result = HTTPoison.post(@consumer_route, body, headers, recv_timeout: :timer.seconds(20))
+
+    case post_result do
+      {:ok, http_result} ->
+        status_code = Map.get(http_result, :status_code, 500)
+        decoded_body = Poison.decode(Map.get(http_result, :body))
+
+        case decoded_body do
+          {:ok, result_body} ->
+            if(Map.get(@success_codes, status_code, false)) do
+              {:ok, result_body}
+            else
+              {:error, result_body}
+            end
+
+          _ ->
+            {:error, "Unknown"}
+        end
+
+      _ ->
+        {:error, "Unknown"}
     end
   end
 

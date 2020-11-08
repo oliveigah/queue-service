@@ -31,7 +31,7 @@ defmodule Queue.Cache do
   def run_server_process(id) do
     case(is_already_running?(id)) do
       false ->
-        {:ok, pid} = start_child(id)
+        {_, pid} = start_child(id)
         pid
 
       {true, pid} ->

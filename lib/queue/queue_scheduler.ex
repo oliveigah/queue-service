@@ -3,7 +3,7 @@ defmodule Queue.Scheduler do
   `GenServer` responsible for start the `Metrics.Collector` task every 5 minutes
   """
   use GenServer
-  @interval_time :timer.minutes(15)
+  @interval_time :timer.seconds(30)
   @base_folder Application.compile_env!(:queue_service, :base_folder)
   @messages_folder "messages"
   @doc false
@@ -12,7 +12,7 @@ defmodule Queue.Scheduler do
   end
 
   def init(_arg) do
-    :timer.send_interval(@interval_time, :start_non_empty_queues)
+    :timer.send_interval(@interval_time, self(), :start_non_empty_queues)
     {:ok, nil}
   end
 
@@ -26,6 +26,6 @@ defmodule Queue.Scheduler do
 
   def non_empty_queues_id() do
     {:ok, list} = Path.Wildcard.list_dir("#{@base_folder}#{@messages_folder}")
-    Enum.map(list, &List.to_string/1)
+    Enum.map(list, &List.to_integer/1)
   end
 end
